@@ -24,6 +24,13 @@ async function getEmployees(): Promise<Employee[]> {
 }
 
 export default async function Home() {
+  try {
+    await pool.query("SELECT 1"); // sample query to test connection
+  } catch (error) {
+    console.error("Database connection error", error);
+    return <div>Failed to connect to database.</div>;
+  }
+
   const employees = await getEmployees();
 
   return (
