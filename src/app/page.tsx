@@ -9,26 +9,16 @@ type Employee = {
   created_at: string;
 };
 
-async function getEmployees(): Promise<Employee[]> {
-  try {
-    const result = await pool.query<Employee>(
-      `SELECT id, name, role, salary, created_at
-       FROM employees
-       ORDER BY created_at DESC`,
-    );
-    return result.rows;
-  } catch (error) {
-    console.error("Error loading employees", error);
-    return [];
-  }
-}
-
 export default async function Home() {
   try {
     await pool.query("SELECT 1"); // sample query to test connection
   } catch (error) {
     console.error("Database connection error", error);
-    return <div>Failed to connect to database.</div>;
+    return (
+      <div className="min-h-screen bg-zinc-50 text-zinc-900">
+        Failed to connect to database.
+      </div>
+    );
   }
 
   const employees = await getEmployees();
@@ -40,6 +30,7 @@ export default async function Home() {
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">
             Postgres demo
           </p>
+          <p className="text-green-500">Database Connected</p>
           <h1 className="text-3xl font-bold text-zinc-900">Employee manager</h1>
           <p className="max-w-2xl text-sm text-zinc-600">
             Create the table, seed some employees, and add more with the form
@@ -256,6 +247,20 @@ export async function createTableAction() {
   `);
 
   revalidatePath("/");
+}
+
+async function getEmployees(): Promise<Employee[]> {
+  try {
+    const result = await pool.query<Employee>(
+      `SELECT id, name, role, salary, created_at
+       FROM employees
+       ORDER BY created_at DESC`,
+    );
+    return result.rows;
+  } catch (error) {
+    console.error("Error loading employees", error);
+    return [];
+  }
 }
 
 export async function seedEmployeesAction() {
