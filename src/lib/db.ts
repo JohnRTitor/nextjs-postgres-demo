@@ -7,8 +7,6 @@ if (!databaseUrl) {
   throw new Error("DATABASE_URL is not set. Ensure it exists in the root .env");
 }
 
-const pool = new Pool({
+export const sql = new Pool({
   connectionString: databaseUrl,
 });
-
-export { pool };

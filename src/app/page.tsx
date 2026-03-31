@@ -1,5 +1,5 @@
 import { revalidatePath } from "next/cache";
-import { pool } from "@/lib/db";
+import { sql } from "@/lib/db";
 
 type Employee = {
   id: number;
@@ -9,14 +9,46 @@ type Employee = {
   created_at: string;
 };
 
-export default async function Home() {
+export default async function HomePage() {
   try {
-    await pool.query("SELECT 1"); // sample query to test connection
+    await sql.query("SELECT 1"); // sample query to test connection
   } catch (error) {
     console.error("Database connection error", error);
     return (
       <div className="min-h-screen bg-zinc-50 text-zinc-900">
-        Failed to connect to database.
+        <div className="mx-auto flex max-w-4xl flex-col gap-10 px-6 py-12">
+          <Header status="disconnected" />
+          Failed to connect to database.
+        </div>
+      </div>
+    );
+  }
+
+  const checkTable = await sql.query(
+    `SELECT to_regclass('public.employees') as table_name`,
+  ); // Check if the "employees" table exists
+
+  if (!checkTable.rows[0].table_name) {
+    // employees table does not exist
+    return (
+      <div className="min-h-screen bg-zinc-50 text-zinc-900">
+        <div className="mx-auto flex max-w-4xl flex-col gap-10 px-6 py-12">
+          <Header status="connected" />
+          <section className="grid gap-6 md:grid-cols-2">
+            <Card>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-semibold">1) Create table</h2>
+                  <p className="text-sm text-zinc-600">
+                    Sets up an <code>employees</code> table if it does not
+                    exist.
+                  </p>
+                </div>
+                <FormButton action={createTableAction}>Create table</FormButton>
+              </div>
+            </Card>
+          </section>
+        </div>
       </div>
     );
   }
@@ -26,32 +58,18 @@ export default async function Home() {
   return (
     <div className="min-h-screen bg-zinc-50 text-zinc-900">
       <div className="mx-auto flex max-w-4xl flex-col gap-10 px-6 py-12">
-        <header className="flex flex-col gap-3 border-b border-zinc-200 pb-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">
-            Postgres demo
-          </p>
-          <p className="text-green-500">Database Connected</p>
-          <h1 className="text-3xl font-bold text-zinc-900">Employee manager</h1>
-          <p className="max-w-2xl text-sm text-zinc-600">
-            Create the table, seed some employees, and add more with the form
-            below. All actions run on the server and use your{" "}
-            <code className="rounded bg-zinc-100 px-1 py-0.5 text-xs">
-              DATABASE_URL
-            </code>{" "}
-            connection string.
-          </p>
-        </header>
+        <Header status="table_exists" />
 
         <section className="grid gap-6 md:grid-cols-2">
           <Card>
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h2 className="text-lg font-semibold">1) Create table</h2>
+                <h2 className="text-lg font-semibold">1) Drop table</h2>
                 <p className="text-sm text-zinc-600">
-                  Sets up an <code>employees</code> table if it does not exist.
+                  Drop the <code>employees</code> table.
                 </p>
               </div>
-              <FormButton action={createTableAction}>Create table</FormButton>
+              <FormButton action={dropTableAction}>Drop table</FormButton>
             </div>
           </Card>
 
@@ -129,25 +147,25 @@ export default async function Home() {
                 {employees.length === 1 ? "" : "s"}.
               </p>
             </div>
-            <form action={refreshAction}>
-              <button
-                type="submit"
-                className="rounded-md border border-zinc-200 px-3 py-1.5 text-sm font-medium text-zinc-800 transition hover:bg-zinc-100"
-              >
-                Refresh
-              </button>
-            </form>
+
+            <FormButton
+              action={refreshAction}
+              className="rounded-md border border-zinc-200 px-3 py-1.5 text-sm font-medium text-zinc-800 transition hover:bg-zinc-100"
+            >
+              Refresh
+            </FormButton>
           </div>
 
           <div className="mt-4 overflow-hidden rounded-lg border border-zinc-200">
             <table className="min-w-full divide-y divide-zinc-200 text-sm">
               <thead className="bg-zinc-50">
                 <tr>
-                  <HeaderCell>ID</HeaderCell>
-                  <HeaderCell>Name</HeaderCell>
-                  <HeaderCell>Role</HeaderCell>
-                  <HeaderCell>Salary</HeaderCell>
-                  <HeaderCell>Created</HeaderCell>
+                  <TableHeaderCell>ID</TableHeaderCell>
+                  <TableHeaderCell>Name</TableHeaderCell>
+                  <TableHeaderCell>Role</TableHeaderCell>
+                  <TableHeaderCell>Salary</TableHeaderCell>
+                  <TableHeaderCell>Created</TableHeaderCell>
+                  <TableHeaderCell>Actions</TableHeaderCell>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-200 bg-white">
@@ -163,15 +181,28 @@ export default async function Home() {
                 ) : (
                   employees.map((emp) => (
                     <tr key={emp.id} className="hover:bg-zinc-50">
-                      <DataCell>{emp.id}</DataCell>
-                      <DataCell className="font-medium">{emp.name}</DataCell>
-                      <DataCell>{emp.role}</DataCell>
-                      <DataCell>
+                      <TableDataCell>{emp.id}</TableDataCell>
+                      <TableDataCell className="font-medium">
+                        {emp.name}
+                      </TableDataCell>
+                      <TableDataCell>{emp.role}</TableDataCell>
+                      <TableDataCell>
                         {`$${Number(emp.salary).toLocaleString()}`}
-                      </DataCell>
-                      <DataCell>
+                      </TableDataCell>
+                      <TableDataCell>
                         {new Date(emp.created_at).toLocaleString()}
-                      </DataCell>
+                      </TableDataCell>
+                      <TableDataCell>
+                        <form action={deleteEmployeeAction}>
+                          <input type="hidden" name="id" value={emp.id} />
+                          <button
+                            type="submit"
+                            className="rounded-lg border border-zinc-200 px-4 py-2 text-white bg-red-900 hover:bg-red-800"
+                          >
+                            Delete
+                          </button>
+                        </form>
+                      </TableDataCell>
                     </tr>
                   ))
                 )}
@@ -184,59 +215,93 @@ export default async function Home() {
   );
 }
 
-function Card({ children }: { children: React.ReactNode }) {
+type HeaderProps = {
+  status: "table_exists" | "connected" | "disconnected";
+};
+const Header = ({ status }: HeaderProps) => {
+  return (
+    <header className="flex flex-col gap-3 border-b border-zinc-200 pb-6">
+      <div className="inline-flex flex-row gap-4 items-center justify-between">
+        <div className="uppercase font-semibold text-zinc-500 text-xl">
+          Postgres Demo
+        </div>
+        {status === "table_exists" ? (
+          <div className="text-green-500 grid">
+            Database Connected and Table Exists
+          </div>
+        ) : status === "connected" ? (
+          <div className="text-green-500">Database Connected</div>
+        ) : (
+          <div className="text-red-500">Database Connection Failed</div>
+        )}
+      </div>
+
+      <h1 className="text-3xl font-bold text-zinc-900">Employee Manager</h1>
+      <p className="max-w-2xl text-sm text-zinc-600">
+        Create the table, seed some employees, and add more with the form below.
+        All actions run on the server and use your{" "}
+        <code className="rounded bg-zinc-100 px-1 py-0.5 text-xs">
+          DATABASE_URL
+        </code>{" "}
+        connection string.
+      </p>
+    </header>
+  );
+};
+
+const Card = ({ children }: { children: React.ReactNode }) => {
   return (
     <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
       {children}
     </div>
   );
-}
+};
 
-function HeaderCell({ children }: { children: React.ReactNode }) {
+const TableHeaderCell = ({ children }: { children: React.ReactNode }) => {
   return (
     <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-600">
       {children}
     </th>
   );
-}
+};
 
-function DataCell({
+const TableDataCell = ({
   children,
   className = "",
 }: {
   children: React.ReactNode;
   className?: string;
-}) {
+}) => {
   return (
     <td className={`px-4 py-3 text-sm text-zinc-800 ${className}`}>
       {children}
     </td>
   );
-}
+};
 
-function FormButton({
-  action,
-  children,
-}: {
+type FormButtonProps = {
   action: (formData: FormData) => Promise<void> | void;
+  className?: string;
   children: React.ReactNode;
-}) {
+};
+const FormButton = ({
+  action,
+  className = "inline-flex items-center gap-2 rounded-md bg-black px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-zinc-800 focus-visible:outline focus-visible:outline-offset-2 focus-visible:outline-black",
+  children,
+}: FormButtonProps) => {
   return (
     <form action={action}>
-      <button
-        type="submit"
-        className="inline-flex items-center gap-2 rounded-md bg-black px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-zinc-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black"
-      >
+      <button type="submit" className={className}>
         {children}
       </button>
     </form>
   );
-}
+};
 
-export async function createTableAction() {
+const createTableAction = async () => {
   "use server";
 
-  await pool.query(`
+  await sql.query(`
     CREATE TABLE IF NOT EXISTS employees (
       id SERIAL PRIMARY KEY,
       name TEXT NOT NULL,
@@ -247,11 +312,19 @@ export async function createTableAction() {
   `);
 
   revalidatePath("/");
-}
+};
 
-async function getEmployees(): Promise<Employee[]> {
+const dropTableAction = async () => {
+  "use server";
+
+  await sql.query(`DROP TABLE employees`);
+
+  revalidatePath("/");
+};
+
+const getEmployees = async (): Promise<Employee[]> => {
   try {
-    const result = await pool.query<Employee>(
+    const result = await sql.query<Employee>(
       `SELECT id, name, role, salary, created_at
        FROM employees
        ORDER BY created_at DESC`,
@@ -261,12 +334,12 @@ async function getEmployees(): Promise<Employee[]> {
     console.error("Error loading employees", error);
     return [];
   }
-}
+};
 
-export async function seedEmployeesAction() {
+const seedEmployeesAction = async () => {
   "use server";
 
-  await pool.query(`
+  await sql.query(`
     INSERT INTO employees (name, role, salary)
     VALUES
       ('Ada Lovelace', 'Engineer', 160000),
@@ -276,9 +349,9 @@ export async function seedEmployeesAction() {
   `);
 
   revalidatePath("/");
-}
+};
 
-export async function addEmployeeAction(formData: FormData) {
+const addEmployeeAction = async (formData: FormData) => {
   "use server";
 
   const name = String(formData.get("name") ?? "").trim();
@@ -290,15 +363,25 @@ export async function addEmployeeAction(formData: FormData) {
     throw new Error("Invalid form input");
   }
 
-  await pool.query(
+  await sql.query(
     `INSERT INTO employees (name, role, salary) VALUES ($1, $2, $3)`,
     [name, role, salary],
   );
 
   revalidatePath("/");
-}
+};
 
-export async function refreshAction() {
+const deleteEmployeeAction = async (formData: FormData) => {
+  "use server";
+  const id = Number(formData.get("id"));
+  if (!id) {
+    throw new Error("Invalid ID Input");
+  }
+  await sql.query(`DELETE FROM employees WHERE id=$1`, [id]);
+  revalidatePath("/");
+};
+
+const refreshAction = async () => {
   "use server";
   revalidatePath("/");
-}
+};
